@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List
 import uuid
 import os
+import zipfile
 
 app = FastAPI()
 
@@ -67,27 +68,83 @@ def montar_contexto(payload):
     return contexto
 
 
-@app.post("/gerar-documento")
-async def gerar_documento(data: dict):
-
-    dia_inad = data.get("DiaInad")
+def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
+    """Gera um DOCX para um único item do payload.
+    Retorna (caminho_arquivo_tmp, nome_arquivo_final).
+    """
+    dia_inad = item.get("DiaInad")
     if dia_inad is None:
-        raise HTTPException(400, "DiaInad não informado no payload")
+        raise HTTPException(400, f"Item {indice}: DiaInad não informado no payload")
 
     tipo_documento = determinar_tipo_documento(dia_inad)
-    contexto = montar_contexto(data)
+    contexto = montar_contexto(item)
     possui_fiador = contexto["possuiFiador"]
 
     template_path = escolher_template(tipo_documento, possui_fiador)
     doc = DocxTemplate(template_path)
     doc.render(contexto)
 
-    nome_pes = data.get("nome_pes", "documento")
-    filename = f"{TMP_FOLDER}/{uuid.uuid4()}.docx"
-    doc.save(filename)
+    nome_pes = item.get("nome_pes", "documento")
+    fiador_nome = ""
+    fiadores = contexto.get("fiadores", [])
+    if fiadores:
+        fiador_nome = f"_fiador_{fiadores[0].get('Fiador', '')}"
+
+    nome_final = f"{tipo_documento}_{nome_pes}{fiador_nome}.docx"
+    # Limpar caracteres problemáticos do nome do arquivo
+    nome_final = nome_final.replace("/", "_").replace("\\", "_")
+
+    tmp_path = f"{TMP_FOLDER}/{uuid.uuid4()}.docx"
+    doc.save(tmp_path)
+
+    return tmp_path, nome_final
+
+
+@app.post("/gerar-documento")
+async def gerar_documento(data: List[dict]):
+    if not data:
+        raise HTTPException(400, "Payload vazio")
+
+    # Se vier apenas 1 item, retorna o DOCX direto
+    if len(data) == 1:
+        tmp_path, nome_final = gerar_documento_individual(data[0], 0)
+        return FileResponse(
+            tmp_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=nome_final,
+        )
+
+    # Múltiplos itens: gera cada DOCX e empacota num ZIP
+    arquivos_gerados = []
+    nomes_usados = {}
+
+    for i, item in enumerate(data):
+        tmp_path, nome_final = gerar_documento_individual(item, i)
+
+        # Evitar nomes duplicados no ZIP
+        if nome_final in nomes_usados:
+            nomes_usados[nome_final] += 1
+            base, ext = os.path.splitext(nome_final)
+            nome_final = f"{base}_{nomes_usados[nome_final]}{ext}"
+        else:
+            nomes_usados[nome_final] = 0
+
+        arquivos_gerados.append((tmp_path, nome_final))
+
+    zip_path = f"{TMP_FOLDER}/{uuid.uuid4()}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for tmp_path, nome_final in arquivos_gerados:
+            zf.write(tmp_path, nome_final)
+
+    # Limpar os DOCX temporários
+    for tmp_path, _ in arquivos_gerados:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
     return FileResponse(
-        filename,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=f"{tipo_documento}_{nome_pes}.docx"
+        zip_path,
+        media_type="application/zip",
+        filename="documentos.zip",
     )
