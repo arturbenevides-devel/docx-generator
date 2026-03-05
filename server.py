@@ -68,27 +68,21 @@ def montar_contexto(payload):
 
 
 @app.post("/gerar-documento")
-async def gerar_documento(data: List[dict]):
+async def gerar_documento(data: dict):
 
-    if len(data) == 0:
-        raise HTTPException(400, "Payload vazio")
-
-    # Processa o primeiro item (n8n envia um por vez no loop)
-    item = data[0]
-
-    dia_inad = item.get("DiaInad")
+    dia_inad = data.get("DiaInad")
     if dia_inad is None:
         raise HTTPException(400, "DiaInad não informado no payload")
 
     tipo_documento = determinar_tipo_documento(dia_inad)
-    contexto = montar_contexto(item)
+    contexto = montar_contexto(data)
     possui_fiador = contexto["possuiFiador"]
 
     template_path = escolher_template(tipo_documento, possui_fiador)
     doc = DocxTemplate(template_path)
     doc.render(contexto)
 
-    nome_pes = item.get("nome_pes", "documento")
+    nome_pes = data.get("nome_pes", "documento")
     filename = f"{TMP_FOLDER}/{uuid.uuid4()}.docx"
     doc.save(filename)
 
