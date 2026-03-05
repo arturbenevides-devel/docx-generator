@@ -2,4 +2,3 @@ fastapi
 uvicorn
 docxtpl
 python-docx
-python-dotenv
