@@ -85,12 +85,9 @@ def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
     doc.render(contexto)
 
     nome_pes = item.get("nome_pes", "documento")
-    fiador_nome = ""
-    fiadores = contexto.get("fiadores", [])
-    if fiadores:
-        fiador_nome = f"_fiador_{fiadores[0].get('Fiador', '')}"
+    cpf_pes = item.get("cpf_pes", "")
 
-    nome_final = f"{tipo_documento}_{nome_pes}{fiador_nome}.docx"
+    nome_final = f"{nome_pes}_{cpf_pes}.docx"
     # Limpar caracteres problemáticos do nome do arquivo
     nome_final = nome_final.replace("/", "_").replace("\\", "_")
 
