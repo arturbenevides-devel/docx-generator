@@ -76,7 +76,7 @@ def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
     if dia_inad is None:
         raise HTTPException(400, f"Item {indice}: DiaInad não informado no payload")
 
-    tipo_documento = item.get("tipo_documento") or determinar_tipo_documento(dia_inad)
+    tipo_documento = determinar_tipo_documento(dia_inad)
     contexto = montar_contexto(item)
     possui_fiador = contexto["possuiFiador"]
 
