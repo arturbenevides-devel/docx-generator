@@ -30,7 +30,13 @@ def formatar_cpf(cpf):
     return cpf or ""
 
 
-TIPOS_DOCUMENTO = ("notificacao", "execucao")
+def determinar_tipo_documento(dia_inad):
+    if dia_inad in (30, 45):
+        return "notificacao"
+    elif dia_inad == 61:
+        return "execucao"
+    else:
+        raise HTTPException(400, f"DiaInad {dia_inad} não mapeado para nenhum tipo de documento")
 
 
 def escolher_template(tipo_documento, possui_fiador):
@@ -62,7 +68,15 @@ def montar_contexto(payload):
     return contexto
 
 
-def gerar_documento_individual(item: dict, tipo_documento: str) -> tuple[str, str]:
+def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
+    """Gera um DOCX para um único item do payload.
+    Retorna (caminho_arquivo_tmp, nome_arquivo_final).
+    """
+    dia_inad = item.get("DiaInad")
+    if dia_inad is None:
+        raise HTTPException(400, f"Item {indice}: DiaInad não informado no payload")
+
+    tipo_documento = item.get("tipo_documento") or determinar_tipo_documento(dia_inad)
     contexto = montar_contexto(item)
     possui_fiador = contexto["possuiFiador"]
 
@@ -73,7 +87,8 @@ def gerar_documento_individual(item: dict, tipo_documento: str) -> tuple[str, st
     nome_pes = item.get("nome_pes", "documento")
     cpf_pes = item.get("cpf_pes", "")
 
-    nome_final = f"{nome_pes}_{cpf_pes}_{tipo_documento}.docx"
+    nome_final = f"{nome_pes}_{cpf_pes}.docx"
+    # Limpar caracteres problemáticos do nome do arquivo
     nome_final = nome_final.replace("/", "_").replace("\\", "_")
 
     tmp_path = f"{TMP_FOLDER}/{uuid.uuid4()}.docx"
@@ -87,21 +102,31 @@ async def gerar_documento(data: List[dict]):
     if not data:
         raise HTTPException(400, "Payload vazio")
 
+    # Se vier apenas 1 item, retorna o DOCX direto
+    if len(data) == 1:
+        tmp_path, nome_final = gerar_documento_individual(data[0], 0)
+        return FileResponse(
+            tmp_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=nome_final,
+        )
+
+    # Múltiplos itens: gera cada DOCX e empacota num ZIP
     arquivos_gerados = []
     nomes_usados = {}
 
-    for item in data:
-        for tipo_documento in TIPOS_DOCUMENTO:
-            tmp_path, nome_final = gerar_documento_individual(item, tipo_documento)
+    for i, item in enumerate(data):
+        tmp_path, nome_final = gerar_documento_individual(item, i)
 
-            if nome_final in nomes_usados:
-                nomes_usados[nome_final] += 1
-                base, ext = os.path.splitext(nome_final)
-                nome_final = f"{base}_{nomes_usados[nome_final]}{ext}"
-            else:
-                nomes_usados[nome_final] = 0
+        # Evitar nomes duplicados no ZIP
+        if nome_final in nomes_usados:
+            nomes_usados[nome_final] += 1
+            base, ext = os.path.splitext(nome_final)
+            nome_final = f"{base}_{nomes_usados[nome_final]}{ext}"
+        else:
+            nomes_usados[nome_final] = 0
 
-            arquivos_gerados.append((tmp_path, nome_final))
+        arquivos_gerados.append((tmp_path, nome_final))
 
     zip_path = f"{TMP_FOLDER}/{uuid.uuid4()}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
