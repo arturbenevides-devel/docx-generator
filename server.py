@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from docxtpl import DocxTemplate
 from datetime import datetime
 from typing import List
@@ -12,11 +13,20 @@ app = FastAPI()
 BASE_TEMPLATE = "templates"
 TMP_FOLDER = "/tmp"
 
+MAX_ITENS_LOTE = 100
+
 MESES = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
     5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
     9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
 }
+
+
+def _remover_arquivo(caminho):
+    try:
+        os.remove(caminho)
+    except OSError:
+        pass
 
 
 def formatar_data_extenso():
@@ -98,9 +108,12 @@ def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
 
 
 @app.post("/gerar-documento")
-async def gerar_documento(data: List[dict]):
+def gerar_documento(data: List[dict]):
     if not data:
         raise HTTPException(400, "Payload vazio")
+
+    if len(data) > MAX_ITENS_LOTE:
+        raise HTTPException(413, f"Máximo de {MAX_ITENS_LOTE} itens por requisição")
 
     # Se vier apenas 1 item, retorna o DOCX direto
     if len(data) == 1:
@@ -109,6 +122,7 @@ async def gerar_documento(data: List[dict]):
             tmp_path,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             filename=nome_final,
+            background=BackgroundTask(_remover_arquivo, tmp_path),
         )
 
     # Múltiplos itens: gera cada DOCX e empacota num ZIP
@@ -144,4 +158,5 @@ async def gerar_documento(data: List[dict]):
         zip_path,
         media_type="application/zip",
         filename="documentos.zip",
+        background=BackgroundTask(_remover_arquivo, zip_path),
     )
