@@ -13,7 +13,7 @@ app = FastAPI()
 BASE_TEMPLATE = "templates"
 TMP_FOLDER = "/tmp"
 
-MAX_ITENS_LOTE = 100
+MAX_ITENS_LOTE = 300
 
 MESES = {
     1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
