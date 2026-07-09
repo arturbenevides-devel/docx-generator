@@ -51,7 +51,7 @@ def formatar_cpf(cpf):
 
 
 def determinar_tipo_documento(dia_inad):
-    if dia_inad in (30, 45):
+    if dia_inad == 30:
         return "notificacao"
     elif dia_inad == 61:
         return "execucao"
