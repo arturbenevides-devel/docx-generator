@@ -122,18 +122,7 @@ def gerar_documento(data: List[dict]):
     if not data:
         raise HTTPException(400, "Payload vazio")
 
-    # Se vier apenas 1 item, retorna o DOCX direto
-    if len(data) == 1:
-        tmp_path, nome_final = gerar_documento_individual(data[0], 0)
-        return FileResponse(
-            tmp_path,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            filename=nome_final,
-            headers=_header_documentos(data),
-            background=BackgroundTask(_remover_arquivo, tmp_path),
-        )
-
-    # Múltiplos itens: gera cada DOCX e empacota num ZIP
+    # Sempre empacota num ZIP (mesmo com 1 item) para resposta uniforme
     arquivos_gerados = []
     nomes_usados = {}
 
