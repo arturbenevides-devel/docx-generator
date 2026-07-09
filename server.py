@@ -7,6 +7,7 @@ from typing import List
 import uuid
 import os
 import zipfile
+import json
 
 app = FastAPI()
 
@@ -25,6 +26,17 @@ def _remover_arquivo(caminho):
         os.remove(caminho)
     except OSError:
         pass
+
+
+def _header_documentos(itens):
+    """Cabeçalho X-Documentos com a lista [{nome, cpf}] dos documentos gerados.
+    json.dumps usa ensure_ascii=True por padrão, então o valor sai ASCII-safe
+    (acentos viram \\uXXXX) e é aceito como header HTTP sem problema."""
+    resumo = [
+        {"nome": item.get("nome_pes", ""), "cpf": item.get("cpf_pes", "")}
+        for item in itens
+    ]
+    return {"X-Documentos": json.dumps(resumo)}
 
 
 def formatar_data_extenso():
@@ -117,6 +129,7 @@ def gerar_documento(data: List[dict]):
             tmp_path,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             filename=nome_final,
+            headers=_header_documentos(data),
             background=BackgroundTask(_remover_arquivo, tmp_path),
         )
 
@@ -153,5 +166,6 @@ def gerar_documento(data: List[dict]):
         zip_path,
         media_type="application/zip",
         filename="documentos.zip",
+        headers=_header_documentos(data),
         background=BackgroundTask(_remover_arquivo, zip_path),
     )
