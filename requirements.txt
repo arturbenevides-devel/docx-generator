@@ -1,4 +1,4 @@
-fastapi
-uvicorn
-docxtpl
-python-docx
+fastapi==0.136.3
+uvicorn==0.48.0
+docxtpl==0.20.2
+python-docx==1.2.0

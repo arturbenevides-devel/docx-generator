@@ -102,7 +102,7 @@ def gerar_documento_individual(item: dict, indice: int) -> tuple[str, str]:
 
     template_path = escolher_template(tipo_documento, possui_fiador)
     doc = DocxTemplate(template_path)
-    doc.render(contexto)
+    doc.render(contexto, autoescape=True)
 
     nome_pes = item.get("nome_pes", "documento")
     cpf_pes = item.get("cpf_pes", "")
