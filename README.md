@@ -4,7 +4,7 @@ API que gera os documentos da régua de cobrança da BP8 a partir de templates W
 
 | `DiaInad` | Documento | Template |
 |---|---|---|
-| `33` | Notificação extrajudicial | `templates/notificacao/` |
+| `30` | Notificação extrajudicial | `templates/notificacao/` |
 | `61` | Execução judicial | `templates/execucao/` |
 
 Cada documento sai na versão **com fiador** ou **sem fiador**, conforme a lista `fiadores` do item. A resposta é sempre um `.zip`, mesmo quando só um documento é gerado.
@@ -30,7 +30,7 @@ curl -X POST http://localhost:8000/gerar-documento \
   -o documentos.zip \
   -d '[
     {
-      "DiaInad": 33,
+      "DiaInad": 30,
       "nome_pes": "MARIA DA SILVA",
       "cpf_pes": "12345678901",
       "ConcatIdentificador_unid": "2-176",
@@ -67,7 +67,7 @@ curl -X POST http://localhost:8000/gerar-documento \
 |---|---|
 | `400` | Lista vazia (`Payload vazio`) |
 | `400` | Item sem `DiaInad` |
-| `400` | `DiaInad` diferente de `33` ou `61` |
+| `400` | `DiaInad` diferente de `30` ou `61` |
 | `500` | Arquivo de template não encontrado |
 
 **Um item inválido derruba o lote inteiro**: nenhum documento é gerado, nem os dos itens válidos. Filtre os itens antes de chamar a API.
@@ -80,7 +80,7 @@ Todo campo enviado fica disponível no template. Os campos usados hoje pelos tem
 
 | Campo | Conteúdo |
 |---|---|
-| `DiaInad` | `33` ou `61`, **como número** |
+| `DiaInad` | `30` ou `61`, **como número** |
 | `nome_pes` | Nome do cliente (também usado no nome do arquivo) |
 | `cpf_pes` | CPF só com dígitos (também usado no nome do arquivo) |
 | `ConcatIdentificador_unid` | Unidade (ex.: `2-176`) |
@@ -88,7 +88,7 @@ Todo campo enviado fica disponível no template. Os campos usados hoje pelos tem
 | `Endereco_pend`, `NumEnd_pend`, `Bairro_pend`, `Cidade_pend`, `UF_pend`, `CEP_pend` | Endereço do cliente |
 | `fiadores` | Lista de fiadores. Vazia (ou ausente) = template **sem fiador** |
 
-**Só na notificação (33)**
+**Só na notificação (30)**
 
 | Campo | Conteúdo |
 |---|---|
@@ -130,7 +130,7 @@ templates/
 
 Fluxo da régua de cobrança:
 
-1. Um Switch separa os itens por `DiaInad` (33, 61 e o resto, que não vai pra API).
+1. Um Switch separa os itens por `DiaInad` (30, 61 e o resto, que não vai pra API).
 2. Os itens de cada régua são agrupados numa lista e enviados numa única chamada `POST /gerar-documento`.
 3. O ZIP de resposta passa por um node de descompressão. Ele devolve **um item com vários binários** (`file_0`, `file_1`, ...).
 4. Um Code node separa cada binário em um item próprio (campo `data`) e liga cada documento ao item que o gerou pela regra de nome do arquivo (`{nome_pes}_{cpf_pes}.docx`, com os sufixos `_1`, `_2`). A partir daí cada documento segue pro e-mail e pro ticket do Octadesk.
